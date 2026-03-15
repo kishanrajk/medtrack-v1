@@ -23,11 +23,7 @@ def seed_db():
             db.add(admin)
             db.commit()
 
-        # 2. Check if equipment exists already
-        if db.query(models.Equipment).count() > 0:
-            print("Equipment already exists. Skipping bulk seeding.")
-            return
-
+        # 2. Add Equipment (Check by Asset ID to avoid duplicates)
         print("Seeding diverse equipment...")
         today = datetime.date.today()
         
@@ -42,65 +38,96 @@ def seed_db():
             {"name": "Ultrasound", "asset_id": "ULT-008", "manufacturer": "Samsung", "model": "RS85", "department": "Diagnostics", "status": models.EquipmentStatus.active, "m_days": 180},
             {"name": "ECG Machine", "asset_id": "ECG-009", "manufacturer": "Schiller", "model": "CardioVit", "department": "Cardiology", "status": models.EquipmentStatus.active, "m_days": 90},
             {"name": "Anesthesia Workstation", "asset_id": "ANS-010", "manufacturer": "GE", "model": "Avance", "department": "OT", "status": models.EquipmentStatus.active, "m_days": 90},
+            {"name": "Surgical Laser", "asset_id": "LSR-011", "manufacturer": "Lumenis", "model": "AcuPulse", "department": "Surgery", "status": models.EquipmentStatus.active, "m_days": 180},
+            {"name": "Blood Gas Analyzer", "asset_id": "BGA-012", "manufacturer": "Radiometer", "model": "ABL90", "department": "Lab", "status": models.EquipmentStatus.active, "m_days": 90}
         ]
 
         inserted_eqs = []
         for i, eq in enumerate(equipment_data):
-            # Calculate a next maintenance date relative to today
-            m_date = today + datetime.timedelta(days=(i * 10) - 20) # Mixture of overdue and upcoming
-            new_eq = models.Equipment(
-                name=eq["name"],
-                asset_id=eq["asset_id"],
-                serial_number=f"SN-SYS-{eq['asset_id']}",
-                manufacturer=eq["manufacturer"],
-                model=eq["model"],
-                department=eq["department"],
-                status=eq["status"],
-                maintenance_frequency_days=eq["m_days"],
-                next_maintenance_date=m_date,
-                purchase_date=today - datetime.timedelta(days=730)
-            )
-            db.add(new_eq)
-            inserted_eqs.append(new_eq)
+            existing = db.query(models.Equipment).filter(models.Equipment.asset_id == eq["asset_id"]).first()
+            if not existing:
+                m_date = today + datetime.timedelta(days=(i * 10) - 20)
+                new_eq = models.Equipment(
+                    name=eq["name"],
+                    asset_id=eq["asset_id"],
+                    serial_number=f"SN-SYS-{eq['asset_id']}",
+                    manufacturer=eq["manufacturer"],
+                    model=eq["model"],
+                    department=eq["department"],
+                    status=eq["status"],
+                    maintenance_frequency_days=eq["m_days"],
+                    next_maintenance_date=m_date,
+                    purchase_date=today - datetime.timedelta(days=730)
+                )
+                db.add(new_eq)
+                db.flush()
+                inserted_eqs.append(new_eq)
+            else:
+                inserted_eqs.append(existing)
         
-        db.flush()
-
         # 3. Add Historical Maintenance & Repair Records for the Graph
-        # We need data for Oct 25, Nov 25, Dec 25, Jan 26, Feb 26, Mar 26 (approx)
         print("Seeding cost history for the last 6 months...")
         
         months_back = 6
+        admin = db.query(models.User).filter(models.User.email == "admin@hospital.com").first()
+        
         for i in range(months_back):
             record_date = today - datetime.timedelta(days=i * 30 + 15)
-            # Maintenance records
-            for j in range(2):
-                eq = inserted_eqs[(i + j) % len(inserted_eqs)]
-                m_rec = models.MaintenanceRecord(
-                    equipment_id=eq.id,
-                    maintenance_date=record_date,
-                    performed_by="System Auto-Seed",
-                    notes="Completed scheduled maintenance.",
-                    status=models.MaintenanceStatus.completed,
-                    cost=2000 + (i * 200) + (j * 100)
-                )
-                db.add(m_rec)
+            # Add records only if none exist for this month to avoid bloat
+            existing_m = db.query(models.MaintenanceRecord).filter(
+                models.MaintenanceRecord.maintenance_date == record_date
+            ).first()
             
-            # Repair records
-            for k in range(1):
-                eq = inserted_eqs[(i + k + 3) % len(inserted_eqs)]
-                r_rec = models.RepairRecord(
-                    equipment_id=eq.id,
-                    issue_description="Component failure during operation.",
-                    repair_date=record_date,
-                    completion_date=record_date + datetime.timedelta(days=2),
-                    status=models.RepairStatus.resolved,
-                    technician_notes="Replaced faulty part.",
-                    cost=5000 + (i * 500)
-                )
-                db.add(r_rec)
+            if not existing_m:
+                # Maintenance records
+                for j in range(2):
+                    eq = inserted_eqs[(i + j) % len(inserted_eqs)]
+                    m_rec = models.MaintenanceRecord(
+                        equipment_id=eq.id,
+                        maintenance_date=record_date,
+                        performed_by="System Auto-Seed",
+                        notes="Completed scheduled maintenance.",
+                        status=models.MaintenanceStatus.completed,
+                        cost=2000 + (i * 200) + (j * 100)
+                    )
+                    db.add(m_rec)
+                
+                # Repair records
+                for k in range(1):
+                    eq = inserted_eqs[(i + k + 3) % len(inserted_eqs)]
+                    r_rec = models.RepairRecord(
+                        equipment_id=eq.id,
+                        issue_description="Component failure during operation.",
+                        repair_date=record_date,
+                        completion_date=record_date + datetime.timedelta(days=2),
+                        status=models.RepairStatus.resolved,
+                        technician_notes="Replaced faulty part.",
+                        cost=5000 + (i * 500)
+                    )
+                    db.add(r_rec)
+
+        # 4. Add Notifications for Admin
+        if admin:
+            print("Seeding notifications...")
+            alert_data = [
+                {"title": "Maintenance Overdue", "msg": "X-Ray Machine (XR-001) maintenance is 20 days overdue.", "type": "alert"},
+                {"title": "Repair Completed", "msg": "Ventilator (VNT-002) repair has been finalized.", "type": "info"},
+                {"title": "System Update", "msg": "Welcome to MedTrack v1.2. New financial analytics are live!", "type": "info"}
+            ]
+            for alert in alert_data:
+                existing_n = db.query(models.Notification).filter(models.Notification.message == alert["msg"]).first()
+                if not existing_n:
+                    notif = models.Notification(
+                        user_id=admin.id,
+                        title=alert["title"],
+                        message=alert["msg"],
+                        type=alert["type"],
+                        created_at=today
+                    )
+                    db.add(notif)
 
         db.commit()
-        print("Database seeded with rich history!")
+        print("Database enriched with success!")
 
     except Exception as e:
         db.rollback()
