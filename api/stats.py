@@ -12,40 +12,48 @@ router = APIRouter()
 def get_cost_stats(db: Session = Depends(get_db)):
     # Get costs for the last 6 months
     today = date.today()
-    six_months_ago = today - timedelta(days=180)
     
-    # 1. Fetch Maintenance Costs
-    maint_records = db.query(
-        func.strftime('%Y-%m', models.MaintenanceRecord.maintenance_date).label('month'),
-        func.sum(models.MaintenanceRecord.cost).label('total')
-    ).filter(
-        models.MaintenanceRecord.maintenance_date >= six_months_ago,
-        models.MaintenanceRecord.status == models.MaintenanceStatus.completed
-    ).group_by('month').all()
-    
-    # 2. Fetch Repair Costs
-    repair_records = db.query(
-        func.strftime('%Y-%m', models.RepairRecord.repair_date).label('month'),
-        func.sum(models.RepairRecord.cost).label('total')
-    ).filter(
-        models.RepairRecord.repair_date >= six_months_ago,
-        models.RepairRecord.status == models.RepairStatus.resolved
-    ).group_by('month').all()
-    
-    # Process data into a format Chart.js likes
-    # Labels for the last 6 months
+    # Calculate month buckets (Last 5 months + current)
     months = []
     for i in range(5, -1, -1):
-        d = today - timedelta(days=i*30)
-        months.append(d.strftime('%Y-%m'))
+        # Handle month/year wrap-around
+        m = today.month - i
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        months.append(f"{y}-{m:02d}")
     
-    maint_map = {m: c for m, c in maint_records}
-    repair_map = {m: c for m, c in repair_records}
+    # Fetch records
+    six_months_ago = today - timedelta(days=185) # Buffer
     
-    maint_data = [float(maint_map.get(m, 0) or 0) for m in months]
-    repair_data = [float(repair_map.get(m, 0) or 0) for m in months]
+    maint_records = db.query(models.MaintenanceRecord).filter(
+        models.MaintenanceRecord.maintenance_date >= six_months_ago,
+        models.MaintenanceRecord.status == models.MaintenanceStatus.completed
+    ).all()
     
-    # Convert labels to more readable format like "Jan", "Feb"
+    repair_records = db.query(models.RepairRecord).filter(
+        models.RepairRecord.repair_date >= six_months_ago,
+        models.RepairRecord.status == models.RepairStatus.resolved
+    ).all()
+    
+    # Aggregate in Python
+    maint_map = defaultdict(float)
+    for r in maint_records:
+        if r.maintenance_date:
+            m_key = r.maintenance_date.strftime('%Y-%m')
+            maint_map[m_key] += float(r.cost or 0)
+            
+    repair_map = defaultdict(float)
+    for r in repair_records:
+        if r.repair_date:
+            r_key = r.repair_date.strftime('%Y-%m')
+            repair_map[r_key] += float(r.cost or 0)
+            
+    maint_data = [maint_map[m] for m in months]
+    repair_data = [repair_map[m] for m in months]
+    
+    # Convert labels to more readable format like "Jan 25"
     month_names = []
     for m in months:
         y, mon = m.split('-')

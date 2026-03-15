@@ -66,22 +66,25 @@ def seed_db():
                 inserted_eqs.append(existing)
         
         # 3. Add Historical Maintenance & Repair Records for the Graph
-        print("Seeding cost history for the last 6 months...")
+        print("Ensuring 6 months of cost history...")
         
         months_back = 6
         admin = db.query(models.User).filter(models.User.email == "admin@hospital.com").first()
         
+        records_added = 0
         for i in range(months_back):
-            record_date = today - datetime.timedelta(days=i * 30 + 15)
-            # Add records only if none exist for this month to avoid bloat
-            existing_m = db.query(models.MaintenanceRecord).filter(
-                models.MaintenanceRecord.maintenance_date == record_date
-            ).first()
+            # Use mid-month dates for history
+            record_date = today.replace(day=15) - datetime.timedelta(days=i * 30)
             
-            if not existing_m:
-                # Maintenance records
-                for j in range(2):
-                    eq = inserted_eqs[(i + j) % len(inserted_eqs)]
+            # Maintenance records
+            for j in range(2):
+                eq = inserted_eqs[(i + j) % len(inserted_eqs)]
+                # Add if not already present for this exact eq and date
+                existing = db.query(models.MaintenanceRecord).filter(
+                    models.MaintenanceRecord.equipment_id == eq.id,
+                    models.MaintenanceRecord.maintenance_date == record_date
+                ).first()
+                if not existing:
                     m_rec = models.MaintenanceRecord(
                         equipment_id=eq.id,
                         maintenance_date=record_date,
@@ -91,10 +94,16 @@ def seed_db():
                         cost=2000 + (i * 200) + (j * 100)
                     )
                     db.add(m_rec)
-                
-                # Repair records
-                for k in range(1):
-                    eq = inserted_eqs[(i + k + 3) % len(inserted_eqs)]
+                    records_added += 1
+            
+            # Repair records
+            for k in range(1):
+                eq = inserted_eqs[(i + k + 3) % len(inserted_eqs)]
+                existing = db.query(models.RepairRecord).filter(
+                    models.RepairRecord.equipment_id == eq.id,
+                    models.RepairRecord.repair_date == record_date
+                ).first()
+                if not existing:
                     r_rec = models.RepairRecord(
                         equipment_id=eq.id,
                         issue_description="Component failure during operation.",
@@ -104,6 +113,9 @@ def seed_db():
                         cost=5000 + (i * 500)
                     )
                     db.add(r_rec)
+                    records_added += 1
+
+        print(f"Historical records processed. New records added: {records_added}")
 
         # 4. Add Notifications for Admin
         if admin:
