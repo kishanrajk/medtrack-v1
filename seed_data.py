@@ -79,41 +79,41 @@ def seed_db():
             # Maintenance records
             for j in range(2):
                 eq = inserted_eqs[(i + j) % len(inserted_eqs)]
-                # Add if not already present for this exact eq and date
-                existing = db.query(models.MaintenanceRecord).filter(
+                # FORCE RE-SEED: Delete records for this exact date/eq to ensure fresh values
+                db.query(models.MaintenanceRecord).filter(
                     models.MaintenanceRecord.equipment_id == eq.id,
                     models.MaintenanceRecord.maintenance_date == record_date
-                ).first()
-                if not existing:
-                    m_rec = models.MaintenanceRecord(
-                        equipment_id=eq.id,
-                        maintenance_date=record_date,
-                        performed_by="System Auto-Seed",
-                        notes="Completed scheduled maintenance.",
-                        status=models.MaintenanceStatus.completed,
-                        cost=2000 + (i * 200) + (j * 100)
-                    )
-                    db.add(m_rec)
-                    records_added += 1
+                ).delete()
+                
+                m_rec = models.MaintenanceRecord(
+                    equipment_id=eq.id,
+                    maintenance_date=record_date,
+                    performed_by="System Auto-Seed",
+                    notes="Completed scheduled maintenance.",
+                    status=models.MaintenanceStatus.completed,
+                    cost=2500 + (i * 300) + (j * 150)
+                )
+                db.add(m_rec)
+                records_added += 1
             
             # Repair records
             for k in range(1):
                 eq = inserted_eqs[(i + k + 3) % len(inserted_eqs)]
-                existing = db.query(models.RepairRecord).filter(
+                db.query(models.RepairRecord).filter(
                     models.RepairRecord.equipment_id == eq.id,
                     models.RepairRecord.repair_date == record_date
-                ).first()
-                if not existing:
-                    r_rec = models.RepairRecord(
-                        equipment_id=eq.id,
-                        issue_description="Component failure during operation.",
-                        repair_date=record_date,
-                        status=models.RepairStatus.resolved,
-                        technician_notes="Replaced faulty part.",
-                        cost=5000 + (i * 500)
-                    )
-                    db.add(r_rec)
-                    records_added += 1
+                ).delete()
+                
+                r_rec = models.RepairRecord(
+                    equipment_id=eq.id,
+                    issue_description="Component failure during operation.",
+                    repair_date=record_date,
+                    status=models.RepairStatus.resolved,
+                    technician_notes="Replaced faulty part.",
+                    cost=6000 + (i * 600)
+                )
+                db.add(r_rec)
+                records_added += 1
 
         print(f"Historical records processed. New records added: {records_added}")
 
