@@ -34,7 +34,7 @@ def seed_db():
             {"name": "Defibrillator", "asset_id": "DEF-004", "manufacturer": "Zoll", "model": "R Series", "department": "ER", "status": models.EquipmentStatus.active, "m_days": 30},
             {"name": "Patient Monitor", "asset_id": "MON-005", "manufacturer": "Philips", "model": "IntelliVue", "department": "ICU", "status": models.EquipmentStatus.active, "m_days": 180},
             {"name": "CT Scanner", "asset_id": "CT-006", "manufacturer": "Canon", "model": "Aquilion", "department": "Radiology", "status": models.EquipmentStatus.active, "m_days": 180},
-            {"name": "Infusion Pump", "asset_id": "PMP-007", "manufacturer": "B. Braun", "model": "Infusomat", "department": "General Ward", "status": models.EquipmentStatus.out_of_order, "m_days": 365},
+            {"name": "Infusion Pump", "asset_id": "PMP-007", "manufacturer": "B. Braun", "model": "Infusomat", "department": "General Ward", "status": models.EquipmentStatus.retired, "m_days": 365},
             {"name": "Ultrasound", "asset_id": "ULT-008", "manufacturer": "Samsung", "model": "RS85", "department": "Diagnostics", "status": models.EquipmentStatus.active, "m_days": 180},
             {"name": "ECG Machine", "asset_id": "ECG-009", "manufacturer": "Schiller", "model": "CardioVit", "department": "Cardiology", "status": models.EquipmentStatus.active, "m_days": 90},
             {"name": "Anesthesia Workstation", "asset_id": "ANS-010", "manufacturer": "GE", "model": "Avance", "department": "OT", "status": models.EquipmentStatus.active, "m_days": 90},
@@ -110,9 +110,9 @@ def seed_db():
         if admin:
             print("Seeding notifications...")
             alert_data = [
-                {"title": "Maintenance Overdue", "msg": "X-Ray Machine (XR-001) maintenance is 20 days overdue.", "type": "alert"},
-                {"title": "Repair Completed", "msg": "Ventilator (VNT-002) repair has been finalized.", "type": "info"},
-                {"title": "System Update", "msg": "Welcome to MedTrack v1.2. New financial analytics are live!", "type": "info"}
+                {"title": "Maintenance Overdue", "msg": "X-Ray Machine (XR-001) maintenance is 20 days overdue.", "type": models.NotificationType.overdue_maintenance},
+                {"title": "Repair Completed", "msg": "Ventilator (VNT-002) repair has been finalized.", "type": models.NotificationType.repair_update},
+                {"title": "System Update", "msg": "Welcome to MedTrack v1.2. New financial analytics are live!", "type": models.NotificationType.repair_update}
             ]
             for alert in alert_data:
                 existing_n = db.query(models.Notification).filter(models.Notification.message == alert["msg"]).first()
