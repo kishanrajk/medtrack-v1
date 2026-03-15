@@ -142,5 +142,5 @@ class NotificationOut(BaseModel):
 # --- Stats ---
 class CostStats(BaseModel):
     labels: List[str]
-    maintenance: List[float]
-    repairs: List[float]
+    maintenanceCosts: List[float]
+    repairCosts: List[float]
