@@ -435,6 +435,11 @@ async function loadSettings() {
 
 let costChart = null;
 function renderCostChart(data) {
+    console.log('Rendering Chart with data:', data);
+    if (!data || !data.labels) {
+        console.error('Invalid chart data received');
+        return;
+    }
     const ctx = document.getElementById('costChart').getContext('2d');
     
     if (costChart) {
