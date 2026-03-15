@@ -4,6 +4,7 @@ import auth_utils
 from database import SessionLocal, engine
 
 def seed_db():
+    print("--- Seeding Process Started ---")
     # Create tables
     models.Base.metadata.create_all(bind=engine)
     db = SessionLocal()

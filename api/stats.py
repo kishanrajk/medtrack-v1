@@ -61,7 +61,7 @@ def get_cost_stats(db: Session = Depends(get_db)):
 def manual_seed():
     from seed_data import seed_db
     try:
-        seed_db(force=True)
+        seed_db()
         return {"status": "success", "message": "Database seeded manually!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
