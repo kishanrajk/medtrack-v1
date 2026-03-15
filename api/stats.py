@@ -62,6 +62,14 @@ def manual_seed():
     from seed_data import seed_db
     try:
         seed_db()
-        return {"status": "success", "message": "Database seeded manually!"}
+        return {
+            "status": "success", 
+            "message": "Database seeded manually!",
+            "version": "v1.2-no-args-fixed"
+        }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {
+            "status": "error", 
+            "message": str(e),
+            "debug_info": "seed_db signature verified locally"
+        }
