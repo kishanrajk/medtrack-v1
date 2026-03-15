@@ -9,155 +9,97 @@ def seed_db():
     db = SessionLocal()
     
     try:
-        # 1. Add Users
-        print("Seeding users...")
-        users_data = [
-            {
-                "name": "Admin User",
-                "email": "admin@hospital.com",
-                "role": models.UserRole.admin,
-                "password": "admin123",
-                "phone": "+919876543210"
-            },
-            {
-                "name": "John Technician",
-                "email": "john@hospital.com",
-                "role": models.UserRole.technician,
-                "password": "tech123",
-                "phone": "+919876543211"
-            },
-            {
-                "name": "Sarah Smith",
-                "email": "sarah@hospital.com",
-                "role": models.UserRole.technician,
-                "password": "tech456",
-                "phone": "+919876543212"
-            }
-        ]
-        
-        for u in users_data:
-            if not db.query(models.User).filter(models.User.email == u["email"]).first():
-                new_user = models.User(
-                    name=u["name"],
-                    email=u["email"],
-                    phone_number=u["phone"],
-                    role=u["role"],
-                    password_hash=auth_utils.get_password_hash(u["password"])
-                )
-                db.add(new_user)
-        db.commit()
-
-        # 2. Add Equipment
-        print("Seeding equipment...")
-        equipment_data = [
-            {
-                "name": "X-Ray Machine",
-                "asset_id": "XR-001",
-                "serial_number": "SN12345",
-                "manufacturer": "GE Healthcare",
-                "model": "Optima XR646",
-                "department": "Radiology",
-                "purchase_date": datetime.date(2023, 5, 10),
-                "warranty_expiry": datetime.date(2025, 5, 10),
-                "status": models.EquipmentStatus.active,
-                "maintenance_frequency_days": 180,
-                "next_maintenance_date": datetime.date.today() + datetime.timedelta(days=30)
-            },
-            {
-                "name": "Ventilator",
-                "asset_id": "VNT-002",
-                "serial_number": "SN67890",
-                "manufacturer": "Dräger",
-                "model": "Evita V500",
-                "department": "ICU",
-                "purchase_date": datetime.date(2024, 1, 15),
-                "warranty_expiry": datetime.date(2026, 1, 15),
-                "status": models.EquipmentStatus.active,
-                "maintenance_frequency_days": 90,
-                "next_maintenance_date": datetime.date.today() - datetime.timedelta(days=5) # Overdue
-            },
-            {
-                "name": "MRI Scanner",
-                "asset_id": "MRI-003",
-                "serial_number": "SN54321",
-                "manufacturer": "Siemens Healthineers",
-                "model": "MAGNETOM Lumina",
-                "department": "Radiology",
-                "purchase_date": datetime.date(2022, 11, 20),
-                "warranty_expiry": datetime.date(2024, 11, 20),
-                "status": models.EquipmentStatus.under_repair,
-                "maintenance_frequency_days": 365,
-                "next_maintenance_date": datetime.date.today() + datetime.timedelta(days=120)
-            },
-            {
-                "name": "Defibrillator",
-                "asset_id": "DEF-004",
-                "serial_number": "SN11223",
-                "manufacturer": "Zoll Medical",
-                "model": "R Series",
-                "department": "Emergency",
-                "purchase_date": datetime.date(2023, 8, 25),
-                "warranty_expiry": datetime.date(2025, 8, 25),
-                "status": models.EquipmentStatus.active,
-                "maintenance_frequency_days": 30,
-                "next_maintenance_date": datetime.date.today() + datetime.timedelta(days=2)
-            }
-        ]
-
-        inserted_equipment = []
-        for eq in equipment_data:
-            existing = db.query(models.Equipment).filter(models.Equipment.asset_id == eq["asset_id"]).first()
-            if not existing:
-                new_eq = models.Equipment(**eq)
-                db.add(new_eq)
-                db.flush() # To get ID
-                inserted_equipment.append(new_eq)
-            else:
-                inserted_equipment.append(existing)
-        db.commit()
-
-        # 3. Add Maintenance Records
-        print("Seeding maintenance records...")
-        if inserted_equipment:
-            # Add a completed record for X-Ray
-            xr = [e for e in inserted_equipment if e.asset_id == "XR-001"][0]
-            if not db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.equipment_id == xr.id).first():
-                mr = models.MaintenanceRecord(
-                    equipment_id=xr.id,
-                    maintenance_date=datetime.date(2023, 11, 15),
-                    performed_by="John Technician",
-                    notes="Regular checkup done. All good.",
-                    status=models.MaintenanceStatus.completed,
-                    cost=2500
-                )
-                db.add(mr)
-            
-            # Add a scheduled record for Ventilator
-            vnt = [e for e in inserted_equipment if e.asset_id == "VNT-002"][0]
-            if not db.query(models.MaintenanceRecord).filter(models.MaintenanceRecord.equipment_id == vnt.id).first():
-                mr = models.MaintenanceRecord(
-                    equipment_id=vnt.id,
-                    maintenance_date=vnt.next_maintenance_date,
-                    status=models.MaintenanceStatus.scheduled
-                )
-                db.add(mr)
-        
-        # 4. Add Repair Records
-        print("Seeding repair records...")
-        mri = [e for e in inserted_equipment if e.asset_id == "MRI-003"][0]
-        if mri and not db.query(models.RepairRecord).filter(models.RepairRecord.equipment_id == mri.id).first():
-            rr = models.RepairRecord(
-                equipment_id=mri.id,
-                issue_description="Artifacts found in imaging.",
-                repair_date=datetime.date.today(),
-                status=models.RepairStatus.in_progress,
-                technician_notes="Waiting for spare parts from Siemens.",
-                cost=15000
+        # 1. Add Users (Skip if requested, but let's ensure admin exists)
+        if not db.query(models.User).filter(models.User.email == "admin@hospital.com").first():
+            print("Seeding admin user...")
+            admin = models.User(
+                name="Admin User",
+                email="admin@hospital.com",
+                role=models.UserRole.admin,
+                password_hash=auth_utils.get_password_hash("admin123"),
+                phone_number="+919876543210"
             )
-            db.add(rr)
+            db.add(admin)
+            db.commit()
+
+        # 2. Check if equipment exists already
+        if db.query(models.Equipment).count() > 0:
+            print("Equipment already exists. Skipping bulk seeding.")
+            return
+
+        print("Seeding diverse equipment...")
+        today = datetime.date.today()
         
+        equipment_data = [
+            {"name": "X-Ray Machine", "asset_id": "XR-001", "manufacturer": "GE", "model": "Optima", "department": "Radiology", "status": models.EquipmentStatus.active, "m_days": 180},
+            {"name": "Ventilator", "asset_id": "VNT-002", "manufacturer": "Dräger", "model": "Evita", "department": "ICU", "status": models.EquipmentStatus.active, "m_days": 90},
+            {"name": "MRI Scanner", "asset_id": "MRI-003", "manufacturer": "Siemens", "model": "MAG", "department": "Radiology", "status": models.EquipmentStatus.under_repair, "m_days": 365},
+            {"name": "Defibrillator", "asset_id": "DEF-004", "manufacturer": "Zoll", "model": "R Series", "department": "ER", "status": models.EquipmentStatus.active, "m_days": 30},
+            {"name": "Patient Monitor", "asset_id": "MON-005", "manufacturer": "Philips", "model": "IntelliVue", "department": "ICU", "status": models.EquipmentStatus.active, "m_days": 180},
+            {"name": "CT Scanner", "asset_id": "CT-006", "manufacturer": "Canon", "model": "Aquilion", "department": "Radiology", "status": models.EquipmentStatus.active, "m_days": 180},
+            {"name": "Infusion Pump", "asset_id": "PMP-007", "manufacturer": "B. Braun", "model": "Infusomat", "department": "General Ward", "status": models.EquipmentStatus.out_of_order, "m_days": 365},
+            {"name": "Ultrasound", "asset_id": "ULT-008", "manufacturer": "Samsung", "model": "RS85", "department": "Diagnostics", "status": models.EquipmentStatus.active, "m_days": 180},
+            {"name": "ECG Machine", "asset_id": "ECG-009", "manufacturer": "Schiller", "model": "CardioVit", "department": "Cardiology", "status": models.EquipmentStatus.active, "m_days": 90},
+            {"name": "Anesthesia Workstation", "asset_id": "ANS-010", "manufacturer": "GE", "model": "Avance", "department": "OT", "status": models.EquipmentStatus.active, "m_days": 90},
+        ]
+
+        inserted_eqs = []
+        for i, eq in enumerate(equipment_data):
+            # Calculate a next maintenance date relative to today
+            m_date = today + datetime.timedelta(days=(i * 10) - 20) # Mixture of overdue and upcoming
+            new_eq = models.Equipment(
+                name=eq["name"],
+                asset_id=eq["asset_id"],
+                serial_number=f"SN-SYS-{eq['asset_id']}",
+                manufacturer=eq["manufacturer"],
+                model=eq["model"],
+                department=eq["department"],
+                status=eq["status"],
+                maintenance_frequency_days=eq["m_days"],
+                next_maintenance_date=m_date,
+                purchase_date=today - datetime.timedelta(days=730)
+            )
+            db.add(new_eq)
+            inserted_eqs.append(new_eq)
+        
+        db.flush()
+
+        # 3. Add Historical Maintenance & Repair Records for the Graph
+        # We need data for Oct 25, Nov 25, Dec 25, Jan 26, Feb 26, Mar 26 (approx)
+        print("Seeding cost history for the last 6 months...")
+        
+        months_back = 6
+        for i in range(months_back):
+            record_date = today - datetime.timedelta(days=i * 30 + 15)
+            # Maintenance records
+            for j in range(2):
+                eq = inserted_eqs[(i + j) % len(inserted_eqs)]
+                m_rec = models.MaintenanceRecord(
+                    equipment_id=eq.id,
+                    maintenance_date=record_date,
+                    performed_by="System Auto-Seed",
+                    notes="Completed scheduled maintenance.",
+                    status=models.MaintenanceStatus.completed,
+                    cost=2000 + (i * 200) + (j * 100)
+                )
+                db.add(m_rec)
+            
+            # Repair records
+            for k in range(1):
+                eq = inserted_eqs[(i + k + 3) % len(inserted_eqs)]
+                r_rec = models.RepairRecord(
+                    equipment_id=eq.id,
+                    issue_description="Component failure during operation.",
+                    repair_date=record_date,
+                    completion_date=record_date + datetime.timedelta(days=2),
+                    status=models.RepairStatus.resolved,
+                    technician_notes="Replaced faulty part.",
+                    cost=5000 + (i * 500)
+                )
+                db.add(r_rec)
+
         db.commit()
-        print("Database seeded successfully!")
+        print("Database seeded with rich history!")
 
     except Exception as e:
         db.rollback()

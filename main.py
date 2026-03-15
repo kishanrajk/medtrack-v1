@@ -13,21 +13,9 @@ async def lifespan(app: FastAPI):
     # 1. Create the database tables
     models.Base.metadata.create_all(bind=engine)
 
-    # 2. Initialize a default user for MVP if doesn't exist
-    db = SessionLocal()
-    try:
-        if not db.query(models.User).filter(models.User.email == "admin@hospital.com").first():
-            admin = models.User(
-                name="Admin User", 
-                email="admin@hospital.com", 
-                role=models.UserRole.admin, 
-                email_alerts_enabled=1,
-                password_hash=auth_utils.get_password_hash("admin123")
-            )
-            db.add(admin)
-            db.commit()
-    finally:
-        db.close()
+    # 2. Initialize a default user and seed data if empty
+    from seed_data import seed_db
+    seed_db()
 
     # 3. Start background jobs
     scheduler.start_scheduler()
