@@ -99,7 +99,6 @@ def seed_db():
                         equipment_id=eq.id,
                         issue_description="Component failure during operation.",
                         repair_date=record_date,
-                        completion_date=record_date + datetime.timedelta(days=2),
                         status=models.RepairStatus.resolved,
                         technician_notes="Replaced faulty part.",
                         cost=5000 + (i * 500)
